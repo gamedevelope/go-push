@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/gamedevelope/go-push/gateway"
+	"github.com/gamedevelope/go-push/src/gateway"
 	"os"
 	"runtime"
 	"time"

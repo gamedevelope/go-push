@@ -1,7 +1,7 @@
 package gateway
 
 import (
-	"github.com/gamedevelope/go-push/common"
+	"github.com/gamedevelope/go-push/src/common"
 	"sync"
 )
 

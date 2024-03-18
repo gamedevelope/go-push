@@ -2,7 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
-	"github.com/gamedevelope/go-push/common"
+	"github.com/gamedevelope/go-push/src/common"
 	"github.com/gorilla/websocket"
 	"time"
 )

@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/gamedevelope/go-push/logic"
+	"github.com/gamedevelope/go-push/src/logic"
 	"os"
 	"runtime"
 	"time"

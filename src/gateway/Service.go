@@ -3,7 +3,7 @@ package gateway
 import (
 	"crypto/tls"
 	"encoding/json"
-	"github.com/gamedevelope/go-push/common"
+	"github.com/gamedevelope/go-push/src/common"
 	"net"
 	"net/http"
 	"strconv"

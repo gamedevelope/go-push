@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build ignore
 // +build ignore
 
 package main
 
 import (
 	"flag"
+	"github.com/gorilla/websocket"
 	"log"
 	"net/url"
-	"github.com/gorilla/websocket"
 	"time"
 )
 
