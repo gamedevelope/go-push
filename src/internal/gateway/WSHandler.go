@@ -12,7 +12,7 @@ func (wsConnection *WSConnection) heartbeatChecker() {
 	var (
 		timer *time.Timer
 	)
-	timer = time.NewTimer(time.Duration(G_config.WsHeartbeatInterval) * time.Second)
+	timer = time.NewTimer(time.Duration(GConfig.WsHeartbeatInterval) * time.Second)
 	for {
 		select {
 		case <-timer.C:
@@ -20,7 +20,7 @@ func (wsConnection *WSConnection) heartbeatChecker() {
 				wsConnection.Close()
 				goto EXIT
 			}
-			timer.Reset(time.Duration(G_config.WsHeartbeatInterval) * time.Second)
+			timer.Reset(time.Duration(GConfig.WsHeartbeatInterval) * time.Second)
 		case <-wsConnection.closeChan:
 			timer.Stop()
 			goto EXIT
@@ -60,10 +60,10 @@ func (wsConnection *WSConnection) handleJoin(bizReq *common.BizMessage) (bizResp
 		return
 	}
 	if len(bizJoinData.Room) == 0 {
-		err = common.ERR_ROOM_ID_INVALID
+		err = common.ErrRoomIdInvalid
 		return
 	}
-	if len(wsConnection.rooms) >= G_config.MaxJoinRoom {
+	if len(wsConnection.rooms) >= GConfig.MaxJoinRoom {
 		// 超过了房间数量限制, 忽略这个请求
 		return
 	}
@@ -73,7 +73,7 @@ func (wsConnection *WSConnection) handleJoin(bizReq *common.BizMessage) (bizResp
 		return
 	}
 	// 建立房间 -> 连接的关系
-	if err = G_connMgr.JoinRoom(bizJoinData.Room, wsConnection); err != nil {
+	if err = connMgr.JoinRoom(bizJoinData.Room, wsConnection); err != nil {
 		return
 	}
 	// 建立连接 -> 房间的关系
@@ -92,7 +92,7 @@ func (wsConnection *WSConnection) handleLeave(bizReq *common.BizMessage) (bizRes
 		return
 	}
 	if len(bizLeaveData.Room) == 0 {
-		err = common.ERR_ROOM_ID_INVALID
+		err = common.ErrRoomIdInvalid
 		return
 	}
 	// 未加入过
@@ -101,7 +101,7 @@ func (wsConnection *WSConnection) handleLeave(bizReq *common.BizMessage) (bizRes
 		return
 	}
 	// 删除房间 -> 连接的关系
-	if err = G_connMgr.LeaveRoom(bizLeaveData.Room, wsConnection); err != nil {
+	if err = connMgr.LeaveRoom(bizLeaveData.Room, wsConnection); err != nil {
 		return
 	}
 	// 删除连接 -> 房间的关系
@@ -115,7 +115,7 @@ func (wsConnection *WSConnection) leaveAll() {
 	)
 	// 从所有房间中退出
 	for roomId, _ = range wsConnection.rooms {
-		G_connMgr.LeaveRoom(roomId, wsConnection)
+		connMgr.LeaveRoom(roomId, wsConnection)
 		delete(wsConnection.rooms, roomId)
 	}
 }
@@ -131,7 +131,7 @@ func (wsConnection *WSConnection) WSHandle() {
 	)
 
 	// 连接加入管理器, 可以推送端查找到
-	G_connMgr.AddConn(wsConnection)
+	connMgr.AddConn(wsConnection)
 
 	// 心跳检测线程
 	go wsConnection.heartbeatChecker()
@@ -180,7 +180,7 @@ func (wsConnection *WSConnection) WSHandle() {
 			}
 			// socket缓冲区写满不是致命错误
 			if err = wsConnection.SendMessage(&common.WSMessage{websocket.TextMessage, buf}); err != nil {
-				if err != common.ERR_SEND_MESSAGE_FULL {
+				if err != common.ErrSendMessageFull {
 					goto ERR
 				} else {
 					err = nil
@@ -197,6 +197,6 @@ ERR:
 	wsConnection.leaveAll()
 
 	// 从连接池中移除
-	G_connMgr.DelConn(wsConnection)
+	connMgr.DelConn(wsConnection)
 	return
 }

@@ -7,8 +7,8 @@ import (
 
 // 推送类型
 const (
-	PUSH_TYPE_ROOM = 1 // 推送房间
-	PUSH_TYPE_ALL  = 2 // 推送在线
+	PushTypeRoom = 1 // 推送房间
+	PushTypeAll  = 2 // 推送在线
 )
 
 // WSMessage websocket的Message对象
@@ -17,7 +17,7 @@ type WSMessage struct {
 	MsgData []byte
 }
 
-// 业务消息的固定格式(type+data)
+// BizMessage 业务消息的固定格式(type+data)
 type BizMessage struct {
 	Type string          `json:"type"` // type消息类型: PING, PONG, JOIN, LEAVE, PUSH
 	Data json.RawMessage `json:"data"` // data数据字段
@@ -25,23 +25,23 @@ type BizMessage struct {
 
 // Data数据类型
 
-// PUSH
+// BizPushData PUSH
 type BizPushData struct {
 	Items []*json.RawMessage `json:"items"`
 }
 
-// PING
+// BizPingData PING
 type BizPingData struct{}
 
-// PONG
+// BizPongData PONG
 type BizPongData struct{}
 
-// JOIN
+// BizJoinData JOIN
 type BizJoinData struct {
 	Room string `json:"room"`
 }
 
-// LEAVE
+// BizLeaveData LEAVE
 type BizLeaveData struct {
 	Room string `json:"room"`
 }
@@ -64,7 +64,7 @@ func EncodeWSMessage(bizMessage *BizMessage) (wsMessage *WSMessage, err error) {
 	return
 }
 
-// 解析{"type": "PING", "data": {...}}的包
+// DecodeBizMessage 解析{"type": "PING", "data": {...}}的包
 func DecodeBizMessage(buf []byte) (bizMessage *BizMessage, err error) {
 	var (
 		bizMsgObj BizMessage

@@ -10,7 +10,7 @@ type GatewayConfig struct {
 	Port     int    `json:"port"`
 }
 
-// 程序配置
+// Config 程序配置
 type Config struct {
 	ServicePort                int             `json:"servicePort"`
 	ServiceReadTimeout         int             `json:"serviceReadTimeout"`

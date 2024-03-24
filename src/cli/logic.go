@@ -1,35 +1,30 @@
-package main
+package cli
 
 import (
-	"flag"
 	"fmt"
-	"github.com/gamedevelope/go-push/src/logic"
+	"github.com/gamedevelope/go-push/src/internal/logic"
+	"github.com/spf13/cobra"
+	"log/slog"
 	"os"
-	"runtime"
 	"time"
 )
 
-var (
-	confFile string // 配置文件路径
-)
+func registerLogic() {
+	serveCmd := &cobra.Command{
+		Use:   "logic",
+		Short: "开启同步服务",
+		Long:  "开启同步服务，同步链上事件并进行处理",
+		Run:   logicRun,
+	}
 
-func initArgs() {
-	flag.StringVar(&confFile, "config", "./logic.json", "where logic.json is.")
-	flag.Parse()
+	rootCmd.AddCommand(serveCmd)
 }
 
-func initEnv() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-}
-
-func main() {
+func logicRun(cmd *cobra.Command, args []string) {
+	slog.Info(`logic run`)
 	var (
 		err error
 	)
-
-	// 初始化环境
-	initArgs()
-	initEnv()
 
 	if err = logic.InitConfig(confFile); err != nil {
 		goto ERR

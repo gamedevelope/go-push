@@ -29,7 +29,7 @@ func (room *Room) Join(wsConn *WSConnection) (err error) {
 	defer room.rwMutex.Unlock()
 
 	if _, existed = room.id2Conn[wsConn.connId]; existed {
-		err = common.ERR_JOIN_ROOM_TWICE
+		err = common.ErrJoinRoomTwice
 		return
 	}
 
@@ -46,7 +46,7 @@ func (room *Room) Leave(wsConn *WSConnection) (err error) {
 	defer room.rwMutex.Unlock()
 
 	if _, existed = room.id2Conn[wsConn.connId]; !existed {
-		err = common.ERR_NOT_IN_ROOM
+		err = common.ErrNotInRoom
 		return
 	}
 

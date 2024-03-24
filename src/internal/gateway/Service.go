@@ -1,10 +1,7 @@
 package gateway
 
 import (
-	"crypto/tls"
 	"encoding/json"
-	"github.com/gamedevelope/go-push/src/common"
-	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -15,7 +12,7 @@ type Service struct {
 }
 
 var (
-	G_service *Service
+	gService *Service
 )
 
 // 全量推送POST msg={}
@@ -36,7 +33,7 @@ func handlePushAll(resp http.ResponseWriter, req *http.Request) {
 	}
 
 	for msgIdx, _ = range msgArr {
-		G_merger.PushAll(&msgArr[msgIdx])
+		GMerger.PushAll(&msgArr[msgIdx])
 	}
 }
 
@@ -61,7 +58,7 @@ func handlePushRoom(resp http.ResponseWriter, req *http.Request) {
 	}
 
 	for msgIdx, _ = range msgArr {
-		G_merger.PushRoom(room, &msgArr[msgIdx])
+		GMerger.PushRoom(room, &msgArr[msgIdx])
 	}
 }
 
@@ -72,7 +69,7 @@ func handleStats(resp http.ResponseWriter, req *http.Request) {
 		err  error
 	)
 
-	if data, err = G_stats.Dump(); err != nil {
+	if data, err = GStats.Dump(); err != nil {
 		return
 	}
 
@@ -81,9 +78,8 @@ func handleStats(resp http.ResponseWriter, req *http.Request) {
 
 func InitService() (err error) {
 	var (
-		mux      *http.ServeMux
-		server   *http.Server
-		listener net.Listener
+		mux    *http.ServeMux
+		server *http.Server
 	)
 
 	// 路由
@@ -92,30 +88,19 @@ func InitService() (err error) {
 	mux.HandleFunc("/push/room", handlePushRoom)
 	mux.HandleFunc("/stats", handleStats)
 
-	// TLS证书解析验证
-	if _, err = tls.LoadX509KeyPair(G_config.ServerPem, G_config.ServerKey); err != nil {
-		return common.ERR_CERT_INVALID
-	}
-
 	// HTTP/2 TLS服务
 	server = &http.Server{
-		ReadTimeout:  time.Duration(G_config.ServiceReadTimeout) * time.Millisecond,
-		WriteTimeout: time.Duration(G_config.ServiceWriteTimeout) * time.Millisecond,
+		Addr:         ":" + strconv.Itoa(GConfig.ServicePort),
+		ReadTimeout:  time.Duration(GConfig.ServiceReadTimeout) * time.Millisecond,
+		WriteTimeout: time.Duration(GConfig.ServiceWriteTimeout) * time.Millisecond,
 		Handler:      mux,
 	}
 
-	// 监听端口
-	if listener, err = net.Listen("tcp", ":"+strconv.Itoa(G_config.ServicePort)); err != nil {
-		return
-	}
-
 	// 赋值全局变量
-	G_service = &Service{
+	gService = &Service{
 		server: server,
 	}
 
-	// 拉起服务
-	go server.ServeTLS(listener, G_config.ServerPem, G_config.ServerKey)
-
+	go gService.server.ListenAndServe()
 	return
 }

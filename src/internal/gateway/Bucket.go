@@ -64,7 +64,7 @@ func (bucket *Bucket) LeaveRoom(roomId string, wsConn *WSConnection) (err error)
 
 	// 找到房间
 	if room, existed = bucket.rooms[roomId]; !existed {
-		err = common.ERR_NOT_IN_ROOM
+		err = common.ErrNotInRoom
 		return
 	}
 
@@ -73,12 +73,12 @@ func (bucket *Bucket) LeaveRoom(roomId string, wsConn *WSConnection) (err error)
 	// 房间为空, 则删除
 	if room.Count() == 0 {
 		delete(bucket.rooms, roomId)
-		RoomCount_DESC()
+		RoomcountDesc()
 	}
 	return
 }
 
-// 推送给Bucket内所有用户
+// PushAll 推送给Bucket内所有用户
 func (bucket *Bucket) PushAll(wsMsg *common.WSMessage) {
 	var (
 		wsConn *WSConnection
@@ -94,7 +94,7 @@ func (bucket *Bucket) PushAll(wsMsg *common.WSMessage) {
 	}
 }
 
-// 推送给某个房间的所有用户
+// PushRoom 推送给某个房间的所有用户
 func (bucket *Bucket) PushRoom(roomId string, wsMsg *common.WSMessage) {
 	var (
 		room    *Room

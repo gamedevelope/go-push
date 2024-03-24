@@ -1,10 +1,5 @@
 package gateway
 
-import (
-	"encoding/json"
-	"io/ioutil"
-)
-
 // Config 程序配置
 type Config struct {
 	WsPort               int    `json:"wsPort"`
@@ -32,23 +27,9 @@ type Config struct {
 }
 
 var (
-	G_config *Config
+	GConfig *Config
 )
 
-func InitConfig(filename string) (err error) {
-	var (
-		content []byte
-		conf    Config
-	)
-
-	if content, err = ioutil.ReadFile(filename); err != nil {
-		return
-	}
-
-	if err = json.Unmarshal(content, &conf); err != nil {
-		return
-	}
-
-	G_config = &conf
-	return
+func InitConfig(c *Config) {
+	GConfig = c
 }

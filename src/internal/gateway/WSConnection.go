@@ -75,8 +75,8 @@ func InitWSConnection(connId uint64, wsSocket *websocket.Conn) (wsConnection *WS
 	wsConnection = &WSConnection{
 		wsSocket:          wsSocket,
 		connId:            connId,
-		inChan:            make(chan *common.WSMessage, G_config.WsInChannelSize),
-		outChan:           make(chan *common.WSMessage, G_config.WsOutChannelSize),
+		inChan:            make(chan *common.WSMessage, GConfig.WsInChannelSize),
+		outChan:           make(chan *common.WSMessage, GConfig.WsOutChannelSize),
 		closeChan:         make(chan byte),
 		lastHeartbeatTime: time.Now(),
 		rooms:             make(map[string]bool),
@@ -92,12 +92,12 @@ func InitWSConnection(connId uint64, wsSocket *websocket.Conn) (wsConnection *WS
 func (wsConnection *WSConnection) SendMessage(message *common.WSMessage) (err error) {
 	select {
 	case wsConnection.outChan <- message:
-		SendMessageTotal_INCR()
+		SendmessagetotalIncr()
 	case <-wsConnection.closeChan:
-		err = common.ERR_CONNECTION_LOSS
+		err = common.ErrConnectionLoss
 	default: // 写操作不会阻塞, 因为channel已经预留给websocket一定的缓冲空间
-		err = common.ERR_SEND_MESSAGE_FULL
-		SendMessageFail_INCR()
+		err = common.ErrSendMessageFull
+		SendmessagefailIncr()
 	}
 	return
 }
@@ -107,7 +107,7 @@ func (wsConnection *WSConnection) ReadMessage() (message *common.WSMessage, err 
 	select {
 	case message = <-wsConnection.inChan:
 	case <-wsConnection.closeChan:
-		err = common.ERR_CONNECTION_LOSS
+		err = common.ErrConnectionLoss
 	}
 	return
 }
@@ -135,7 +135,7 @@ func (wsConnection *WSConnection) IsAlive() bool {
 	defer wsConnection.mutex.Unlock()
 
 	// 连接已关闭 或者 太久没有心跳
-	if wsConnection.isClosed || now.Sub(wsConnection.lastHeartbeatTime) > time.Duration(G_config.WsHeartbeatInterval)*time.Second {
+	if wsConnection.isClosed || now.Sub(wsConnection.lastHeartbeatTime) > time.Duration(GConfig.WsHeartbeatInterval)*time.Second {
 		return false
 	}
 	return true

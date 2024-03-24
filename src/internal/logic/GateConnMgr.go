@@ -23,9 +23,9 @@ var (
 
 // 推送给一个gateway
 func (gateConnMgr *GateConnMgr) doPush(gatewayIdx int, pushJob *PushJob, itemsJson []byte) {
-	if pushJob.pushType == common.PUSH_TYPE_ALL {
+	if pushJob.pushType == common.PushTypeAll {
 		gateConnMgr.gateConns[gatewayIdx].PushAll(itemsJson)
-	} else if pushJob.pushType == common.PUSH_TYPE_ROOM {
+	} else if pushJob.pushType == common.PushTypeRoom {
 		gateConnMgr.gateConns[gatewayIdx].PushRoom(pushJob.roomId, itemsJson)
 	}
 
@@ -95,7 +95,7 @@ func (gateConnMgr *GateConnMgr) PushAll(items []json.RawMessage) (err error) {
 	)
 
 	pushJob = &PushJob{
-		pushType: common.PUSH_TYPE_ALL,
+		pushType: common.PushTypeAll,
 		items:    items,
 	}
 
@@ -104,7 +104,7 @@ func (gateConnMgr *GateConnMgr) PushAll(items []json.RawMessage) (err error) {
 		DispatchTotal_INCR(int64(len(items)))
 	default:
 		DispatchFail_INCR(int64(len(items)))
-		err = common.ERR_LOGIC_DISPATCH_CHANNEL_FULL
+		err = common.ErrLogicDispatchChannelFull
 	}
 	return
 }
@@ -115,7 +115,7 @@ func (gateConnMgr *GateConnMgr) PushRoom(roomId string, items []json.RawMessage)
 	)
 
 	pushJob = &PushJob{
-		pushType: common.PUSH_TYPE_ROOM,
+		pushType: common.PushTypeRoom,
 		roomId:   roomId,
 		items:    items,
 	}
@@ -125,7 +125,7 @@ func (gateConnMgr *GateConnMgr) PushRoom(roomId string, items []json.RawMessage)
 		DispatchTotal_INCR(int64(len(items)))
 	default:
 		DispatchFail_INCR(int64(len(items)))
-		err = common.ERR_LOGIC_DISPATCH_CHANNEL_FULL
+		err = common.ErrLogicDispatchChannelFull
 	}
 	return
 }

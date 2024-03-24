@@ -62,13 +62,13 @@ func InitWSServer() (err error) {
 
 	// HTTP服务
 	server = &http.Server{
-		ReadTimeout:  time.Duration(G_config.WsReadTimeout) * time.Millisecond,
-		WriteTimeout: time.Duration(G_config.WsWriteTimeout) * time.Millisecond,
+		ReadTimeout:  time.Duration(GConfig.WsReadTimeout) * time.Millisecond,
+		WriteTimeout: time.Duration(GConfig.WsWriteTimeout) * time.Millisecond,
 		Handler:      mux,
 	}
 
 	// 监听端口
-	if listener, err = net.Listen("tcp", ":"+strconv.Itoa(G_config.WsPort)); err != nil {
+	if listener, err = net.Listen("tcp", ":"+strconv.Itoa(GConfig.WsPort)); err != nil {
 		return
 	}
 
