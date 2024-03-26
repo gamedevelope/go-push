@@ -51,14 +51,11 @@ func (connMgr *ConnMgr) dispatchWorkerMain(dispatchWorkerIdx int) {
 
 // Job负责消息广播给客户端
 func (connMgr *ConnMgr) jobWorkerMain(jobWorkerIdx int, bucketIdx int) {
-	var (
-		bucket  = connMgr.buckets[bucketIdx]
-		pushJob *PushJob
-	)
+	bucket := connMgr.buckets[bucketIdx]
 
 	for {
 		select {
-		case pushJob = <-connMgr.jobChan[bucketIdx]: // 从Bucket的job queue取出一个任务
+		case pushJob := <-connMgr.jobChan[bucketIdx]: // 从Bucket的job queue取出一个任务
 			PushjobpendingDesc()
 			if pushJob.pushType == common.PushTypeAll {
 				bucket.PushAll(pushJob.wsMsg)
@@ -82,6 +79,7 @@ func InitConnMgr() (err error) {
 		jobChan:      make([]chan *PushJob, GConfig.BucketCount),
 		dispatchChan: make(chan *PushJob, GConfig.DispatchChannelSize),
 	}
+
 	for bucketIdx, _ = range cm.buckets {
 		cm.buckets[bucketIdx] = InitBucket(bucketIdx)                             // 初始化Bucket
 		cm.jobChan[bucketIdx] = make(chan *PushJob, GConfig.BucketJobChannelSize) // Bucket的Job队列
@@ -105,11 +103,7 @@ func (connMgr *ConnMgr) GetBucket(wsConnection *WSConnection) (bucket *Bucket) {
 }
 
 func (connMgr *ConnMgr) AddConn(wsConnection *WSConnection) {
-	var (
-		bucket *Bucket
-	)
-
-	bucket = connMgr.GetBucket(wsConnection)
+	bucket := connMgr.GetBucket(wsConnection)
 	bucket.AddConn(wsConnection)
 
 	OnlineconnectionsIncr()
@@ -146,7 +140,7 @@ func (connMgr *ConnMgr) LeaveRoom(roomId string, wsConn *WSConnection) (err erro
 	return
 }
 
-// 向所有在线用户发送消息
+// PushAll 向所有在线用户发送消息
 func (connMgr *ConnMgr) PushAll(bizMsg *common.BizMessage) (err error) {
 	var (
 		pushJob *PushJob
@@ -167,7 +161,7 @@ func (connMgr *ConnMgr) PushAll(bizMsg *common.BizMessage) (err error) {
 	return
 }
 
-// 向指定房间发送消息
+// PushRoom 向指定房间发送消息
 func (connMgr *ConnMgr) PushRoom(roomId string, bizMsg *common.BizMessage) (err error) {
 	var (
 		pushJob *PushJob

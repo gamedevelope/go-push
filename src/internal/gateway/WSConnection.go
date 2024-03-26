@@ -67,10 +67,6 @@ ERR:
 CLOSED:
 }
 
-/**
-以下是API
-*/
-
 func InitWSConnection(connId uint64, wsSocket *websocket.Conn) (wsConnection *WSConnection) {
 	wsConnection = &WSConnection{
 		wsSocket:          wsSocket,
@@ -88,7 +84,7 @@ func InitWSConnection(connId uint64, wsSocket *websocket.Conn) (wsConnection *WS
 	return
 }
 
-// 发送消息
+// SendMessage 发送消息
 func (wsConnection *WSConnection) SendMessage(message *common.WSMessage) (err error) {
 	select {
 	case wsConnection.outChan <- message:
@@ -102,7 +98,7 @@ func (wsConnection *WSConnection) SendMessage(message *common.WSMessage) (err er
 	return
 }
 
-// 读取消息
+// ReadMessage 读取消息
 func (wsConnection *WSConnection) ReadMessage() (message *common.WSMessage, err error) {
 	select {
 	case message = <-wsConnection.inChan:
@@ -112,7 +108,7 @@ func (wsConnection *WSConnection) ReadMessage() (message *common.WSMessage, err 
 	return
 }
 
-// 关闭连接
+// Close 关闭连接
 func (wsConnection *WSConnection) Close() {
 	wsConnection.wsSocket.Close()
 
@@ -125,7 +121,7 @@ func (wsConnection *WSConnection) Close() {
 	}
 }
 
-// 检查心跳（不需要太频繁）
+// IsAlive 检查心跳（不需要太频繁）
 func (wsConnection *WSConnection) IsAlive() bool {
 	var (
 		now = time.Now()
@@ -141,14 +137,14 @@ func (wsConnection *WSConnection) IsAlive() bool {
 	return true
 }
 
-// 更新心跳
-func (WSConnection *WSConnection) KeepAlive() {
+// KeepAlive 更新心跳
+func (wsConnection *WSConnection) KeepAlive() {
 	var (
 		now = time.Now()
 	)
 
-	WSConnection.mutex.Lock()
-	defer WSConnection.mutex.Unlock()
+	wsConnection.mutex.Lock()
+	defer wsConnection.mutex.Unlock()
 
-	WSConnection.lastHeartbeatTime = now
+	wsConnection.lastHeartbeatTime = now
 }

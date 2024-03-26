@@ -2,8 +2,10 @@ package gateway
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/gamedevelope/go-push/src/common"
 	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -120,7 +122,7 @@ func (wsConnection *WSConnection) leaveAll() {
 	}
 }
 
-// 处理websocket请求
+// WSHandle 处理websocket请求
 func (wsConnection *WSConnection) WSHandle() {
 	var (
 		message *common.WSMessage
@@ -142,8 +144,11 @@ func (wsConnection *WSConnection) WSHandle() {
 			goto ERR
 		}
 
+		logrus.Infof(`client message %v`, message)
+
 		// 只处理文本消息
 		if message.MsgType != websocket.TextMessage {
+			logrus.Errorf(`收到非文本消息 %v`, message)
 			continue
 		}
 
@@ -179,8 +184,8 @@ func (wsConnection *WSConnection) WSHandle() {
 				goto ERR
 			}
 			// socket缓冲区写满不是致命错误
-			if err = wsConnection.SendMessage(&common.WSMessage{websocket.TextMessage, buf}); err != nil {
-				if err != common.ErrSendMessageFull {
+			if err = wsConnection.SendMessage(&common.WSMessage{MsgType: websocket.TextMessage, MsgData: buf}); err != nil {
+				if !errors.Is(err, common.ErrSendMessageFull) {
 					goto ERR
 				} else {
 					err = nil

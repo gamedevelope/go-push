@@ -30,6 +30,9 @@ mac_cw:
 rg:
 	./build/push gateway --app_path="$(PWD)" --app_mode="local"
 
+rc:
+	./build/push client --app_path="$(PWD)" --app_mode="local"
+
 rl:
 	./build/push logic --app_path="$(PWD)" --app_mode="local"
 

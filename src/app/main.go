@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gamedevelope/go-push/src/cli"
 	_ "github.com/gamedevelope/go-push/src/cmd/gateway"
+	_ "github.com/gamedevelope/go-push/src/cmd/wsclient"
 	"github.com/sirupsen/logrus"
 	"runtime"
 	"time"

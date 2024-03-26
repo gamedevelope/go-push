@@ -176,10 +176,7 @@ func initMergeWorker(mergeType int) (worker *MergeWorker) {
 }
 
 func (worker *MergeWorker) pushRoom(room string, msg *json.RawMessage) (err error) {
-	var (
-		context *PushContext
-	)
-	context = &PushContext{
+	context := &PushContext{
 		room: room,
 		msg:  msg,
 	}
@@ -193,12 +190,10 @@ func (worker *MergeWorker) pushRoom(room string, msg *json.RawMessage) (err erro
 }
 
 func (worker *MergeWorker) pushAll(msg *json.RawMessage) (err error) {
-	var (
-		context *PushContext
-	)
-	context = &PushContext{
+	context := &PushContext{
 		msg: msg,
 	}
+
 	select {
 	case worker.contextChan <- context:
 		MergerpendingIncr()
@@ -209,15 +204,11 @@ func (worker *MergeWorker) pushAll(msg *json.RawMessage) (err error) {
 }
 
 func InitMerger() (err error) {
-	var (
-		workerIdx int
-		merger    *Merger
-	)
-
-	merger = &Merger{
+	merger := &Merger{
 		roomWorkers: make([]*MergeWorker, GConfig.MergerWorkerCount),
 	}
-	for workerIdx = 0; workerIdx < GConfig.MergerWorkerCount; workerIdx++ {
+
+	for workerIdx := 0; workerIdx < GConfig.MergerWorkerCount; workerIdx++ {
 		merger.roomWorkers[workerIdx] = initMergeWorker(common.PushTypeRoom)
 	}
 	merger.broadcastWorker = initMergeWorker(common.PushTypeAll)

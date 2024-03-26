@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"github.com/gamedevelope/go-push/src/common"
+	"github.com/sirupsen/logrus"
 	"sync"
 )
 
@@ -10,6 +11,40 @@ type Bucket struct {
 	index   int                      // 我是第几个桶
 	id2Conn map[uint64]*WSConnection // 连接列表(key=连接唯一ID)
 	rooms   map[string]*Room         // 房间列表
+}
+
+func (b *Bucket) GetConn(uid uint64) (*WSConnection, bool) {
+	b.rwMutex.RLock()
+	defer b.rwMutex.RUnlock()
+
+	conn, exist := b.id2Conn[uid]
+
+	return conn, exist
+}
+
+func (b *Bucket) GetRoom(roomId string) (*Room, bool) {
+	b.rwMutex.RLock()
+	defer b.rwMutex.RUnlock()
+
+	room, exist := b.rooms[roomId]
+
+	return room, exist
+}
+
+func (b *Bucket) SetRoom(roomId string, room *Room) {
+	b.rwMutex.Lock()
+	defer b.rwMutex.Unlock()
+
+	b.rooms[roomId] = room
+	RoomCount_INCR()
+}
+
+func (b *Bucket) DelRoom(roomId string) {
+	b.rwMutex.Lock()
+	defer b.rwMutex.Unlock()
+
+	delete(b.rooms, roomId)
+	RoomcountDesc()
 }
 
 func InitBucket(bucketIdx int) (bucket *Bucket) {
@@ -21,49 +56,44 @@ func InitBucket(bucketIdx int) (bucket *Bucket) {
 	return
 }
 
-func (bucket *Bucket) AddConn(wsConn *WSConnection) {
-	bucket.rwMutex.Lock()
-	defer bucket.rwMutex.Unlock()
+func (b *Bucket) AddConn(wsConn *WSConnection) {
+	b.rwMutex.Lock()
+	defer b.rwMutex.Unlock()
 
-	bucket.id2Conn[wsConn.connId] = wsConn
+	b.id2Conn[wsConn.connId] = wsConn
 }
 
-func (bucket *Bucket) DelConn(wsConn *WSConnection) {
-	bucket.rwMutex.Lock()
-	defer bucket.rwMutex.Unlock()
+func (b *Bucket) DelConn(wsConn *WSConnection) {
+	b.rwMutex.Lock()
+	defer b.rwMutex.Unlock()
 
-	delete(bucket.id2Conn, wsConn.connId)
+	delete(b.id2Conn, wsConn.connId)
 }
 
-func (bucket *Bucket) JoinRoom(roomId string, wsConn *WSConnection) (err error) {
+func (b *Bucket) JoinRoom(roomId string, wsConn *WSConnection) (err error) {
 	var (
 		existed bool
 		room    *Room
 	)
-	bucket.rwMutex.Lock()
-	defer bucket.rwMutex.Unlock()
 
 	// 找到房间
-	if room, existed = bucket.rooms[roomId]; !existed {
+	if room, existed = b.GetRoom(roomId); !existed {
 		room = InitRoom(roomId)
-		bucket.rooms[roomId] = room
-		RoomCount_INCR()
+		b.SetRoom(roomId, room)
 	}
 	// 加入房间
 	err = room.Join(wsConn)
 	return
 }
 
-func (bucket *Bucket) LeaveRoom(roomId string, wsConn *WSConnection) (err error) {
+func (b *Bucket) LeaveRoom(roomId string, wsConn *WSConnection) (err error) {
 	var (
 		existed bool
 		room    *Room
 	)
-	bucket.rwMutex.Lock()
-	defer bucket.rwMutex.Unlock()
 
 	// 找到房间
-	if room, existed = bucket.rooms[roomId]; !existed {
+	if room, existed = b.GetRoom(roomId); !existed {
 		err = common.ErrNotInRoom
 		return
 	}
@@ -72,39 +102,53 @@ func (bucket *Bucket) LeaveRoom(roomId string, wsConn *WSConnection) (err error)
 
 	// 房间为空, 则删除
 	if room.Count() == 0 {
-		delete(bucket.rooms, roomId)
-		RoomcountDesc()
+		b.DelRoom(roomId)
 	}
 	return
 }
 
+// PushOne 单一推送
+func (b *Bucket) PushOne(uid uint64, message *common.WSMessage) {
+	wsConn, exist := b.GetConn(uid)
+
+	if exist {
+		err := wsConn.SendMessage(message)
+		if err != nil {
+			logrus.Errorf(`send message error %v`, err)
+			return
+		}
+	}
+}
+
 // PushAll 推送给Bucket内所有用户
-func (bucket *Bucket) PushAll(wsMsg *common.WSMessage) {
+func (b *Bucket) PushAll(wsMsg *common.WSMessage) {
 	var (
 		wsConn *WSConnection
 	)
 
 	// 锁Bucket
-	bucket.rwMutex.RLock()
-	defer bucket.rwMutex.RUnlock()
+	b.rwMutex.RLock()
+	defer b.rwMutex.RUnlock()
 
 	// 全量非阻塞推送
-	for _, wsConn = range bucket.id2Conn {
-		wsConn.SendMessage(wsMsg)
+	for _, wsConn = range b.id2Conn {
+		err := wsConn.SendMessage(wsMsg)
+		if err != nil {
+			logrus.Errorf(`send message error %v`, err)
+			return
+		}
 	}
 }
 
 // PushRoom 推送给某个房间的所有用户
-func (bucket *Bucket) PushRoom(roomId string, wsMsg *common.WSMessage) {
+func (b *Bucket) PushRoom(roomId string, wsMsg *common.WSMessage) {
 	var (
 		room    *Room
 		existed bool
 	)
 
 	// 锁Bucket
-	bucket.rwMutex.RLock()
-	room, existed = bucket.rooms[roomId]
-	bucket.rwMutex.RUnlock()
+	room, existed = b.GetRoom(roomId)
 
 	// 房间不存在
 	if !existed {

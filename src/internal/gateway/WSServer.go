@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
 	"net"
 	"net/http"
 	"strconv"
@@ -44,6 +45,8 @@ func handleConnect(resp http.ResponseWriter, req *http.Request) {
 
 	// 初始化WebSocket的读写协程
 	wsConn = InitWSConnection(connId, wsSocket)
+
+	logrus.Infof(`收到新链接 %v`, connId)
 
 	// 开始处理websocket消息
 	wsConn.WSHandle()

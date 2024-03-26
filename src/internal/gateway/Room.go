@@ -2,55 +2,48 @@ package gateway
 
 import (
 	"github.com/gamedevelope/go-push/src/common"
+	"github.com/sirupsen/logrus"
 	"sync"
 )
 
-// 房间
+// Room 房间
 type Room struct {
-	rwMutex sync.RWMutex
-	roomId  string
-	id2Conn map[uint64]*WSConnection
+	rwMutex  sync.RWMutex
+	roomId   string
+	connHash map[uint64]*WSConnection
 }
 
 func InitRoom(roomId string) (room *Room) {
 	room = &Room{
-		roomId:  roomId,
-		id2Conn: make(map[uint64]*WSConnection),
+		roomId:   roomId,
+		connHash: make(map[uint64]*WSConnection),
 	}
 	return
 }
 
 func (room *Room) Join(wsConn *WSConnection) (err error) {
-	var (
-		existed bool
-	)
-
 	room.rwMutex.Lock()
 	defer room.rwMutex.Unlock()
 
-	if _, existed = room.id2Conn[wsConn.connId]; existed {
+	if _, existed := room.connHash[wsConn.connId]; existed {
 		err = common.ErrJoinRoomTwice
 		return
 	}
 
-	room.id2Conn[wsConn.connId] = wsConn
+	room.connHash[wsConn.connId] = wsConn
 	return
 }
 
 func (room *Room) Leave(wsConn *WSConnection) (err error) {
-	var (
-		existed bool
-	)
-
 	room.rwMutex.Lock()
 	defer room.rwMutex.Unlock()
 
-	if _, existed = room.id2Conn[wsConn.connId]; !existed {
+	if _, existed := room.connHash[wsConn.connId]; !existed {
 		err = common.ErrNotInRoom
 		return
 	}
 
-	delete(room.id2Conn, wsConn.connId)
+	delete(room.connHash, wsConn.connId)
 	return
 }
 
@@ -58,17 +51,18 @@ func (room *Room) Count() int {
 	room.rwMutex.RLock()
 	defer room.rwMutex.RUnlock()
 
-	return len(room.id2Conn)
+	return len(room.connHash)
 }
 
 func (room *Room) Push(wsMsg *common.WSMessage) {
-	var (
-		wsConn *WSConnection
-	)
 	room.rwMutex.RLock()
 	defer room.rwMutex.RUnlock()
 
-	for _, wsConn = range room.id2Conn {
-		wsConn.SendMessage(wsMsg)
+	for _, wsConn := range room.connHash {
+		err := wsConn.SendMessage(wsMsg)
+		if err != nil {
+			logrus.Errorf(`send message error %v`, err)
+			return
+		}
 	}
 }
