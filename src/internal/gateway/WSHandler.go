@@ -11,10 +11,7 @@ import (
 
 // 每隔1秒, 检查一次连接是否健康
 func (wsConnection *WSConnection) heartbeatChecker() {
-	var (
-		timer *time.Timer
-	)
-	timer = time.NewTimer(time.Duration(GConfig.WsHeartbeatInterval) * time.Second)
+	timer := time.NewTimer(time.Duration(defaultServer.cfg.WsHeartbeatInterval) * time.Second)
 	for {
 		select {
 		case <-timer.C:
@@ -22,7 +19,7 @@ func (wsConnection *WSConnection) heartbeatChecker() {
 				wsConnection.Close()
 				goto EXIT
 			}
-			timer.Reset(time.Duration(GConfig.WsHeartbeatInterval) * time.Second)
+			timer.Reset(time.Duration(defaultServer.cfg.WsHeartbeatInterval) * time.Second)
 		case <-wsConnection.closeChan:
 			timer.Stop()
 			goto EXIT
@@ -65,7 +62,7 @@ func (wsConnection *WSConnection) handleJoin(bizReq *common.BizMessage) (bizResp
 		err = common.ErrRoomIdInvalid
 		return
 	}
-	if len(wsConnection.rooms) >= GConfig.MaxJoinRoom {
+	if len(wsConnection.rooms) >= defaultServer.cfg.MaxJoinRoom {
 		// 超过了房间数量限制, 忽略这个请求
 		return
 	}
@@ -75,7 +72,7 @@ func (wsConnection *WSConnection) handleJoin(bizReq *common.BizMessage) (bizResp
 		return
 	}
 	// 建立房间 -> 连接的关系
-	if err = connMgr.JoinRoom(bizJoinData.Room, wsConnection); err != nil {
+	if err = defaultServer.connMgr.JoinRoom(bizJoinData.Room, wsConnection); err != nil {
 		return
 	}
 	// 建立连接 -> 房间的关系
@@ -103,7 +100,7 @@ func (wsConnection *WSConnection) handleLeave(bizReq *common.BizMessage) (bizRes
 		return
 	}
 	// 删除房间 -> 连接的关系
-	if err = connMgr.LeaveRoom(bizLeaveData.Room, wsConnection); err != nil {
+	if err = defaultServer.connMgr.LeaveRoom(bizLeaveData.Room, wsConnection); err != nil {
 		return
 	}
 	// 删除连接 -> 房间的关系
@@ -117,7 +114,7 @@ func (wsConnection *WSConnection) leaveAll() {
 	)
 	// 从所有房间中退出
 	for roomId, _ = range wsConnection.rooms {
-		connMgr.LeaveRoom(roomId, wsConnection)
+		defaultServer.connMgr.LeaveRoom(roomId, wsConnection)
 		delete(wsConnection.rooms, roomId)
 	}
 }
@@ -133,7 +130,7 @@ func (wsConnection *WSConnection) WSHandle() {
 	)
 
 	// 连接加入管理器, 可以推送端查找到
-	connMgr.AddConn(wsConnection)
+	defaultServer.connMgr.AddConn(wsConnection)
 
 	// 心跳检测线程
 	go wsConnection.heartbeatChecker()
@@ -202,6 +199,6 @@ ERR:
 	wsConnection.leaveAll()
 
 	// 从连接池中移除
-	connMgr.DelConn(wsConnection)
+	defaultServer.connMgr.DelConn(wsConnection)
 	return
 }

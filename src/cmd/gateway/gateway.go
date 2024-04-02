@@ -39,36 +39,7 @@ func gatewayRun(cmd *cobra.Command, args []string) {
 		logrus.Infof(`成功解析配置文件 %v`, cf)
 	}
 
-	var (
-		err error
-	)
-
-	gateway.InitConfig(&config.AppConf.GatewayConf)
-
-	// 统计
-	if err = gateway.InitStats(); err != nil {
-		logrus.Panicf(`init stats %v`, err)
-	}
-
-	// 初始化连接管理器
-	if err = gateway.InitConnMgr(); err != nil {
-		logrus.Panicf(`init conn mgr %v`, err)
-	}
-
-	// 初始化websocket服务器
-	if err = gateway.InitWSServer(); err != nil {
-		logrus.Panicf(`init ws server %v`, err)
-	}
-
-	// 初始化merger合并层
-	if err = gateway.InitMerger(); err != nil {
-		logrus.Panicf(`init merger %v`, err)
-	}
-
-	// 初始化service接口
-	if err = gateway.InitService(); err != nil {
-		logrus.Panicf(`init service %v`, err)
-	}
+	_ = gateway.NewServer(&config.AppConf.GatewayConf)
 
 	for {
 		time.Sleep(1 * time.Second)

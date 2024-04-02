@@ -25,11 +25,3 @@ type Config struct {
 	BucketJobChannelSize int    `json:"bucketJobChannelSize"`
 	BucketJobWorkerCount int    `json:"bucketJobWorkerCount"`
 }
-
-var (
-	GConfig *Config
-)
-
-func InitConfig(c *Config) {
-	GConfig = c
-}

@@ -37,13 +37,11 @@ type MergeWorker struct {
 
 // Merger 广播消息、房间消息的合并
 type Merger struct {
+	MergerWorkerCount int
+
 	roomWorkers     []*MergeWorker // 房间合并
 	broadcastWorker *MergeWorker   // 广播合并
 }
-
-var (
-	GMerger *Merger
-)
 
 func (worker *MergeWorker) autoCommit(batch *PushBatch) func() {
 	return func() {
@@ -73,15 +71,15 @@ func (worker *MergeWorker) commitBatch(batch *PushBatch) (err error) {
 	// 打包发送
 	if worker.mergeType == common.PushTypeRoom {
 		delete(worker.room2Batch, batch.room)
-		err = connMgr.PushRoom(batch.room, bizMessage)
+		err = defaultServer.connMgr.PushRoom(batch.room, bizMessage)
 	} else if worker.mergeType == common.PushTypeAll {
 		worker.allBatch = nil
-		err = connMgr.PushAll(bizMessage)
+		err = defaultServer.connMgr.PushAll(bizMessage)
 	}
 	return
 }
 
-func (worker *MergeWorker) mergeWorkerMain() {
+func (worker *MergeWorker) mergeWorkerMain(c *Config) {
 	var (
 		context      *PushContext
 		batch        *PushBatch
@@ -93,7 +91,7 @@ func (worker *MergeWorker) mergeWorkerMain() {
 	for {
 		select {
 		case context = <-worker.contextChan:
-			MergerpendingDesc()
+			defaultServer.gStats.MergerpendingDesc()
 
 			isCreated = false
 			// 按房间合并
@@ -117,11 +115,11 @@ func (worker *MergeWorker) mergeWorkerMain() {
 
 			// 新建批次, 启动超时自动提交
 			if isCreated {
-				batch.commitTimer = time.AfterFunc(time.Duration(GConfig.MaxMergerDelay)*time.Millisecond, worker.autoCommit(batch))
+				batch.commitTimer = time.AfterFunc(time.Duration(c.MaxMergerDelay)*time.Millisecond, worker.autoCommit(batch))
 			}
 
 			// 批次未满, 继续等待下次提交
-			if len(batch.items) < GConfig.MaxMergerBatchSize {
+			if len(batch.items) < c.MaxMergerBatchSize {
 				continue
 			}
 
@@ -151,27 +149,27 @@ func (worker *MergeWorker) mergeWorkerMain() {
 
 		// 打点统计
 		if worker.mergeType == common.PushTypeAll {
-			MergeralltotalIncr(int64(len(batch.items)))
+			defaultServer.gStats.MergeralltotalIncr(int64(len(batch.items)))
 			if err != nil {
-				MergerallfailIncr(int64(len(batch.items)))
+				defaultServer.gStats.MergerallfailIncr(int64(len(batch.items)))
 			}
 		} else if worker.mergeType == common.PushTypeRoom {
-			MergerroomtotalIncr(int64(len(batch.items)))
+			defaultServer.gStats.MergerroomtotalIncr(int64(len(batch.items)))
 			if err != nil {
-				MergerroomfailIncr(int64(len(batch.items)))
+				defaultServer.gStats.MergerroomfailIncr(int64(len(batch.items)))
 			}
 		}
 	}
 }
 
-func initMergeWorker(mergeType int) (worker *MergeWorker) {
+func initMergeWorker(mergeType int, c *Config) (worker *MergeWorker) {
 	worker = &MergeWorker{
 		mergeType:   mergeType,
 		room2Batch:  make(map[string]*PushBatch),
-		contextChan: make(chan *PushContext, GConfig.MergerChannelSize),
-		timeoutChan: make(chan *PushBatch, GConfig.MergerChannelSize),
+		contextChan: make(chan *PushContext, c.MergerChannelSize),
+		timeoutChan: make(chan *PushBatch, c.MergerChannelSize),
 	}
-	go worker.mergeWorkerMain()
+	go worker.mergeWorkerMain(c)
 	return
 }
 
@@ -182,7 +180,7 @@ func (worker *MergeWorker) pushRoom(room string, msg *json.RawMessage) (err erro
 	}
 	select {
 	case worker.contextChan <- context:
-		MergerpendingIncr()
+		defaultServer.gStats.MergerpendingIncr()
 	default:
 		err = common.ErrMergeChannelFull
 	}
@@ -196,24 +194,10 @@ func (worker *MergeWorker) pushAll(msg *json.RawMessage) (err error) {
 
 	select {
 	case worker.contextChan <- context:
-		MergerpendingIncr()
+		defaultServer.gStats.MergerpendingIncr()
 	default:
 		err = common.ErrMergeChannelFull
 	}
-	return
-}
-
-func InitMerger() (err error) {
-	merger := &Merger{
-		roomWorkers: make([]*MergeWorker, GConfig.MergerWorkerCount),
-	}
-
-	for workerIdx := 0; workerIdx < GConfig.MergerWorkerCount; workerIdx++ {
-		merger.roomWorkers[workerIdx] = initMergeWorker(common.PushTypeRoom)
-	}
-	merger.broadcastWorker = initMergeWorker(common.PushTypeAll)
-
-	GMerger = merger
 	return
 }
 
@@ -230,7 +214,7 @@ func (merger *Merger) PushRoom(room string, msg *json.RawMessage) (err error) {
 		ch        byte
 	)
 	for _, ch = range []byte(room) {
-		workerIdx = (workerIdx + uint32(ch)*33) % uint32(GConfig.MergerWorkerCount)
+		workerIdx = (workerIdx + uint32(ch)*33) % uint32(merger.MergerWorkerCount)
 	}
 	return merger.roomWorkers[workerIdx].pushRoom(room, msg)
 }

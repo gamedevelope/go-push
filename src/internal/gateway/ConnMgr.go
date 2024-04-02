@@ -20,10 +20,6 @@ type ConnMgr struct {
 	dispatchChan chan *PushJob // 待分发消息队列
 }
 
-var (
-	connMgr *ConnMgr
-)
-
 // 消息分发到Bucket
 func (connMgr *ConnMgr) dispatchWorkerMain(dispatchWorkerIdx int) {
 	var (
@@ -34,7 +30,7 @@ func (connMgr *ConnMgr) dispatchWorkerMain(dispatchWorkerIdx int) {
 	for {
 		select {
 		case pushJob = <-connMgr.dispatchChan:
-			DispatchpendingDesc()
+			defaultServer.gStats.DispatchpendingDesc()
 
 			// 序列化
 			if pushJob.wsMsg, err = common.EncodeWSMessage(pushJob.bizMsg); err != nil {
@@ -42,7 +38,7 @@ func (connMgr *ConnMgr) dispatchWorkerMain(dispatchWorkerIdx int) {
 			}
 			// 分发给所有Bucket, 若Bucket拥塞则等待
 			for bucketIdx, _ = range connMgr.buckets {
-				PushjobpendingIncr()
+				defaultServer.gStats.PushjobpendingIncr()
 				connMgr.jobChan[bucketIdx] <- pushJob
 			}
 		}
@@ -56,7 +52,7 @@ func (connMgr *ConnMgr) jobWorkerMain(jobWorkerIdx int, bucketIdx int) {
 	for {
 		select {
 		case pushJob := <-connMgr.jobChan[bucketIdx]: // 从Bucket的job queue取出一个任务
-			PushjobpendingDesc()
+			defaultServer.gStats.PushjobpendingDesc()
 			if pushJob.pushType == common.PushTypeAll {
 				bucket.PushAll(pushJob.wsMsg)
 			} else if pushJob.pushType == common.PushTypeRoom {
@@ -64,37 +60,6 @@ func (connMgr *ConnMgr) jobWorkerMain(jobWorkerIdx int, bucketIdx int) {
 			}
 		}
 	}
-}
-
-func InitConnMgr() (err error) {
-	var (
-		bucketIdx         int
-		jobWorkerIdx      int
-		dispatchWorkerIdx int
-		cm                *ConnMgr
-	)
-
-	cm = &ConnMgr{
-		buckets:      make([]*Bucket, GConfig.BucketCount),
-		jobChan:      make([]chan *PushJob, GConfig.BucketCount),
-		dispatchChan: make(chan *PushJob, GConfig.DispatchChannelSize),
-	}
-
-	for bucketIdx, _ = range cm.buckets {
-		cm.buckets[bucketIdx] = InitBucket(bucketIdx)                             // 初始化Bucket
-		cm.jobChan[bucketIdx] = make(chan *PushJob, GConfig.BucketJobChannelSize) // Bucket的Job队列
-		// Bucket的Job worker
-		for jobWorkerIdx = 0; jobWorkerIdx < GConfig.BucketJobWorkerCount; jobWorkerIdx++ {
-			go cm.jobWorkerMain(jobWorkerIdx, bucketIdx)
-		}
-	}
-	// 初始化分发协程, 用于将消息扇出给各个Bucket
-	for dispatchWorkerIdx = 0; dispatchWorkerIdx < GConfig.DispatchWorkerCount; dispatchWorkerIdx++ {
-		go cm.dispatchWorkerMain(dispatchWorkerIdx)
-	}
-
-	connMgr = cm
-	return
 }
 
 func (connMgr *ConnMgr) GetBucket(wsConnection *WSConnection) (bucket *Bucket) {
@@ -106,7 +71,7 @@ func (connMgr *ConnMgr) AddConn(wsConnection *WSConnection) {
 	bucket := connMgr.GetBucket(wsConnection)
 	bucket.AddConn(wsConnection)
 
-	OnlineconnectionsIncr()
+	defaultServer.gStats.OnlineconnectionsIncr()
 }
 
 func (connMgr *ConnMgr) DelConn(wsConnection *WSConnection) {
@@ -117,7 +82,7 @@ func (connMgr *ConnMgr) DelConn(wsConnection *WSConnection) {
 	bucket = connMgr.GetBucket(wsConnection)
 	bucket.DelConn(wsConnection)
 
-	OnlineconnectionsDesc()
+	defaultServer.gStats.OnlineconnectionsDesc()
 }
 
 func (connMgr *ConnMgr) JoinRoom(roomId string, wsConn *WSConnection) (err error) {
@@ -153,10 +118,10 @@ func (connMgr *ConnMgr) PushAll(bizMsg *common.BizMessage) (err error) {
 
 	select {
 	case connMgr.dispatchChan <- pushJob:
-		DispatchpendingIncr()
+		defaultServer.gStats.DispatchpendingIncr()
 	default:
 		err = common.ErrDispatchChannelFull
-		DispatchfailIncr()
+		defaultServer.gStats.DispatchfailIncr()
 	}
 	return
 }
@@ -175,10 +140,10 @@ func (connMgr *ConnMgr) PushRoom(roomId string, bizMsg *common.BizMessage) (err 
 
 	select {
 	case connMgr.dispatchChan <- pushJob:
-		DispatchpendingIncr()
+		defaultServer.gStats.DispatchpendingIncr()
 	default:
 		err = common.ErrDispatchChannelFull
-		DispatchfailIncr()
+		defaultServer.gStats.DispatchfailIncr()
 	}
 	return
 }

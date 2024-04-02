@@ -31,83 +31,74 @@ type Stats struct {
 	MergerAllFail   int64 `json:"mergerAllFail"`
 }
 
-var (
-	GStats *Stats
-)
-
-func InitStats() (err error) {
-	GStats = &Stats{}
-	return
+func (s *Stats) DispatchpendingIncr() {
+	atomic.AddInt64(&s.DispatchPending, 1)
 }
 
-func DispatchpendingIncr() {
-	atomic.AddInt64(&GStats.DispatchPending, 1)
+func (s *Stats) DispatchpendingDesc() {
+	atomic.AddInt64(&s.DispatchPending, -1)
 }
 
-func DispatchpendingDesc() {
-	atomic.AddInt64(&GStats.DispatchPending, -1)
+func (s *Stats) PushjobpendingIncr() {
+	atomic.AddInt64(&s.PushJobPending, 1)
 }
 
-func PushjobpendingIncr() {
-	atomic.AddInt64(&GStats.PushJobPending, 1)
+func (s *Stats) PushjobpendingDesc() {
+	atomic.AddInt64(&s.PushJobPending, -1)
 }
 
-func PushjobpendingDesc() {
-	atomic.AddInt64(&GStats.PushJobPending, -1)
+func (s *Stats) OnlineconnectionsIncr() {
+	atomic.AddInt64(&s.OnlineConnections, 1)
 }
 
-func OnlineconnectionsIncr() {
-	atomic.AddInt64(&GStats.OnlineConnections, 1)
+func (s *Stats) OnlineconnectionsDesc() {
+	atomic.AddInt64(&s.OnlineConnections, -1)
 }
 
-func OnlineconnectionsDesc() {
-	atomic.AddInt64(&GStats.OnlineConnections, -1)
+func (s *Stats) RoomCount_INCR() {
+	atomic.AddInt64(&s.RoomCount, 1)
 }
 
-func RoomCount_INCR() {
-	atomic.AddInt64(&GStats.RoomCount, 1)
+func (s *Stats) RoomcountDesc() {
+	atomic.AddInt64(&s.RoomCount, -1)
 }
 
-func RoomcountDesc() {
-	atomic.AddInt64(&GStats.RoomCount, -1)
+func (s *Stats) MergerpendingIncr() {
+	atomic.AddInt64(&s.MergerPending, 1)
 }
 
-func MergerpendingIncr() {
-	atomic.AddInt64(&GStats.MergerPending, 1)
+func (s *Stats) MergerpendingDesc() {
+	atomic.AddInt64(&s.MergerPending, -1)
 }
 
-func MergerpendingDesc() {
-	atomic.AddInt64(&GStats.MergerPending, -1)
+func (s *Stats) MergerroomtotalIncr(batchSize int64) {
+	atomic.AddInt64(&s.MergerRoomTotal, batchSize)
 }
 
-func MergerroomtotalIncr(batchSize int64) {
-	atomic.AddInt64(&GStats.MergerRoomTotal, batchSize)
+func (s *Stats) MergeralltotalIncr(batchSize int64) {
+	atomic.AddInt64(&s.MergerAllTotal, batchSize)
 }
 
-func MergeralltotalIncr(batchSize int64) {
-	atomic.AddInt64(&GStats.MergerAllTotal, batchSize)
+func (s *Stats) MergerroomfailIncr(batchSize int64) {
+	atomic.AddInt64(&s.MergerRoomFail, batchSize)
 }
 
-func MergerroomfailIncr(batchSize int64) {
-	atomic.AddInt64(&GStats.MergerRoomFail, batchSize)
+func (s *Stats) MergerallfailIncr(batchSize int64) {
+	atomic.AddInt64(&s.MergerAllFail, batchSize)
 }
 
-func MergerallfailIncr(batchSize int64) {
-	atomic.AddInt64(&GStats.MergerAllFail, batchSize)
+func (s *Stats) DispatchfailIncr() {
+	atomic.AddInt64(&s.DispatchFail, 1)
 }
 
-func DispatchfailIncr() {
-	atomic.AddInt64(&GStats.DispatchFail, 1)
+func (s *Stats) SendmessagefailIncr() {
+	atomic.AddInt64(&s.SendMessageFail, 1)
 }
 
-func SendmessagefailIncr() {
-	atomic.AddInt64(&GStats.SendMessageFail, 1)
+func (s *Stats) SendmessagetotalIncr() {
+	atomic.AddInt64(&s.SendMessageTotal, 1)
 }
 
-func SendmessagetotalIncr() {
-	atomic.AddInt64(&GStats.SendMessageTotal, 1)
-}
-
-func (stats *Stats) Dump() (data []byte, err error) {
-	return json.Marshal(GStats)
+func (s *Stats) Dump() (data []byte, err error) {
+	return json.Marshal(s)
 }

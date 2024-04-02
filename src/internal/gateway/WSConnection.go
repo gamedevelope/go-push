@@ -21,18 +21,13 @@ type WSConnection struct {
 
 // 读websocket
 func (wsConnection *WSConnection) readLoop() {
-	var (
-		msgType int
-		msgData []byte
-		message *common.WSMessage
-		err     error
-	)
 	for {
-		if msgType, msgData, err = wsConnection.wsSocket.ReadMessage(); err != nil {
+		msgType, msgData, err := wsConnection.wsSocket.ReadMessage()
+		if err != nil {
 			goto ERR
 		}
 
-		message = common.BuildWSMessage(msgType, msgData)
+		message := common.BuildWSMessage(msgType, msgData)
 
 		select {
 		case wsConnection.inChan <- message:
@@ -48,14 +43,10 @@ CLOSED:
 
 // 写websocket
 func (wsConnection *WSConnection) writeLoop() {
-	var (
-		message *common.WSMessage
-		err     error
-	)
 	for {
 		select {
-		case message = <-wsConnection.outChan:
-			if err = wsConnection.wsSocket.WriteMessage(message.MsgType, message.MsgData); err != nil {
+		case message := <-wsConnection.outChan:
+			if err := wsConnection.wsSocket.WriteMessage(message.MsgType, message.MsgData); err != nil {
 				goto ERR
 			}
 		case <-wsConnection.closeChan:
@@ -67,12 +58,12 @@ ERR:
 CLOSED:
 }
 
-func InitWSConnection(connId uint64, wsSocket *websocket.Conn) (wsConnection *WSConnection) {
+func (s *Server) InitWSConnection(connId uint64, wsSocket *websocket.Conn) (wsConnection *WSConnection) {
 	wsConnection = &WSConnection{
 		wsSocket:          wsSocket,
 		connId:            connId,
-		inChan:            make(chan *common.WSMessage, GConfig.WsInChannelSize),
-		outChan:           make(chan *common.WSMessage, GConfig.WsOutChannelSize),
+		inChan:            make(chan *common.WSMessage, s.cfg.WsInChannelSize),
+		outChan:           make(chan *common.WSMessage, s.cfg.WsOutChannelSize),
 		closeChan:         make(chan byte),
 		lastHeartbeatTime: time.Now(),
 		rooms:             make(map[string]bool),
@@ -88,12 +79,10 @@ func InitWSConnection(connId uint64, wsSocket *websocket.Conn) (wsConnection *WS
 func (wsConnection *WSConnection) SendMessage(message *common.WSMessage) (err error) {
 	select {
 	case wsConnection.outChan <- message:
-		SendmessagetotalIncr()
 	case <-wsConnection.closeChan:
 		err = common.ErrConnectionLoss
 	default: // 写操作不会阻塞, 因为channel已经预留给websocket一定的缓冲空间
 		err = common.ErrSendMessageFull
-		SendmessagefailIncr()
 	}
 	return
 }
@@ -123,15 +112,13 @@ func (wsConnection *WSConnection) Close() {
 
 // IsAlive 检查心跳（不需要太频繁）
 func (wsConnection *WSConnection) IsAlive() bool {
-	var (
-		now = time.Now()
-	)
+	now := time.Now()
 
 	wsConnection.mutex.Lock()
 	defer wsConnection.mutex.Unlock()
 
 	// 连接已关闭 或者 太久没有心跳
-	if wsConnection.isClosed || now.Sub(wsConnection.lastHeartbeatTime) > time.Duration(GConfig.WsHeartbeatInterval)*time.Second {
+	if wsConnection.isClosed || now.Sub(wsConnection.lastHeartbeatTime) > time.Duration(defaultServer.cfg.WsHeartbeatInterval)*time.Second {
 		return false
 	}
 	return true
