@@ -28,23 +28,17 @@ var (
 )
 
 func handleConnect(resp http.ResponseWriter, req *http.Request) {
-	var (
-		err      error
-		wsSocket *websocket.Conn
-		connId   uint64
-		wsConn   *WSConnection
-	)
-
 	// WebSocket握手
-	if wsSocket, err = wsUpgrader.Upgrade(resp, req, nil); err != nil {
+	wsSocket, err := wsUpgrader.Upgrade(resp, req, nil)
+	if err != nil {
 		return
 	}
 
 	// 连接唯一标识
-	connId = atomic.AddUint64(&GWsserver.curConnId, 1)
+	connId := atomic.AddUint64(&GWsserver.curConnId, 1)
 
 	// 初始化WebSocket的读写协程
-	wsConn = InitWSConnection(connId, wsSocket)
+	wsConn := InitWSConnection(connId, wsSocket)
 
 	logrus.Infof(`收到新链接 %v`, connId)
 
