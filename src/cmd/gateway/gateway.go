@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/gamedevelope/go-push/src/cli"
 	"github.com/gamedevelope/go-push/src/internal/config"
 	"github.com/gamedevelope/go-push/src/internal/gateway"
@@ -9,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"net/http"
+	"strconv"
 )
 
 var (
@@ -31,6 +34,51 @@ func init() {
 	cli.Register(serveCmd)
 }
 
+type AuthDebug struct {
+}
+
+func (a AuthDebug) GetUid(uri, token string) (uint64, error) {
+	// 将token转换为uid
+	return strconv.ParseUint(token, 10, 64)
+}
+
+type Auth struct {
+}
+
+type UserInfoResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    uint64 `json:"data"`
+}
+
+func (a Auth) GetUid(uri, token string) (uint64, error) {
+	// 从远程接口中获取认证信息
+	logrus.Infof(`从远程接口中获取认证信息 %v`, uri)
+	client := &http.Client{}
+
+	// get user info from remote interface with header
+	req, _ := http.NewRequest("GET", uri, nil)
+	req.Header.Set("Authorization", `Bearer `+token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf(`%v`, resp.StatusCode)
+	}
+
+	// parse user info
+	var userResp UserInfoResponse
+	if err = json.NewDecoder(resp.Body).Decode(&userResp); err != nil {
+		return 0, err
+	}
+
+	return userResp.Data, nil
+}
+
 func gatewayRun(cmd *cobra.Command, args []string) {
 	cf := appPath + `/env/app.` + appMode + `.json`
 
@@ -46,7 +94,7 @@ func gatewayRun(cmd *cobra.Command, args []string) {
 		},
 	}
 
-	gServer := gateway.NewServer(&config.AppConf.GatewayConf, upgrader)
+	gServer := gateway.NewServer(&config.AppConf.GatewayConf, upgrader, AuthDebug{})
 
 	util.Daemon(func() {
 		logrus.Infof(`gateway server quit`)

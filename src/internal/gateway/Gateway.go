@@ -14,6 +14,16 @@ var (
 	gServer *Server
 )
 
+// WSServer WebSocket服务端
+type WSServer struct {
+	server    *http.Server
+	curConnId uint64
+}
+
+type Auth interface {
+	GetUid(string, string) (uint64, error)
+}
+
 type Server struct {
 	cfg     *Config
 	connMgr *ConnMgr
@@ -24,6 +34,8 @@ type Server struct {
 	gStats   *Stats
 	gMerger  *Merger
 	gService *Service
+
+	auth Auth
 }
 
 func (s *Server) InitStats(c *Config) (err error) {
@@ -126,12 +138,13 @@ func (s *Server) InitService(c *Config) (err error) {
 	return
 }
 
-func NewServer(c *Config, upgrader *websocket.Upgrader) *Server {
+func NewServer(c *Config, upgrader *websocket.Upgrader, auth Auth) *Server {
 	var err error
 
 	gServer = &Server{
 		cfg:        c,
 		wsUpgrader: upgrader,
+		auth:       auth,
 	}
 
 	// 统计

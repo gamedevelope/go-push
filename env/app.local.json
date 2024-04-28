@@ -1,5 +1,7 @@
 {
   "gateway_conf": {
+    "authInterface": "http://127.0.0.1:8081/auth/uid",
+
     "websocket监听端口": "建议nginx做代理转发",
     "wsPort": 7777,
 
