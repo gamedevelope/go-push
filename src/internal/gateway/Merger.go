@@ -7,7 +7,7 @@ import (
 )
 
 type PushBatch struct {
-	items       []*json.RawMessage
+	list        []*json.RawMessage
 	commitTimer *time.Timer
 
 	// union {
@@ -50,38 +50,32 @@ func (worker *MergeWorker) autoCommit(batch *PushBatch) func() {
 }
 
 func (worker *MergeWorker) commitBatch(batch *PushBatch) (err error) {
-	var (
-		bizPushData *common.BizPushData
-		bizMessage  *common.BizMessage
-		buf         []byte
-	)
-
-	bizPushData = &common.BizPushData{
-		Items: batch.items,
+	bizPushData := &common.BizMessageData{
+		List: batch.list,
 	}
-	if buf, err = json.Marshal(*bizPushData); err != nil {
+	buf, err := json.Marshal(*bizPushData)
+	if err != nil {
 		return
 	}
 
-	bizMessage = &common.BizMessage{
-		Type: "PUSH",
+	bizMessage := &common.BizMessage{
+		Type: common.MESSAGE,
 		Data: json.RawMessage(buf),
 	}
 
 	// 打包发送
 	if worker.mergeType == common.PushTypeRoom {
 		delete(worker.room2Batch, batch.room)
-		err = defaultServer.connMgr.PushRoom(batch.room, bizMessage)
+		err = gServer.connMgr.PushRoom(batch.room, bizMessage)
 	} else if worker.mergeType == common.PushTypeAll {
 		worker.allBatch = nil
-		err = defaultServer.connMgr.PushAll(bizMessage)
+		err = gServer.connMgr.PushAll(bizMessage)
 	}
 	return
 }
 
 func (worker *MergeWorker) mergeWorkerMain(c *Config) {
 	var (
-		context      *PushContext
 		batch        *PushBatch
 		timeoutBatch *PushBatch
 		existed      bool
@@ -90,8 +84,8 @@ func (worker *MergeWorker) mergeWorkerMain(c *Config) {
 	)
 	for {
 		select {
-		case context = <-worker.contextChan:
-			defaultServer.gStats.MergerpendingDesc()
+		case context := <-worker.contextChan:
+			gServer.gStats.MergerpendingDesc()
 
 			isCreated = false
 			// 按房间合并
@@ -111,7 +105,7 @@ func (worker *MergeWorker) mergeWorkerMain(c *Config) {
 			}
 
 			// 合并消息
-			batch.items = append(batch.items, context.msg)
+			batch.list = append(batch.list, context.msg)
 
 			// 新建批次, 启动超时自动提交
 			if isCreated {
@@ -119,7 +113,7 @@ func (worker *MergeWorker) mergeWorkerMain(c *Config) {
 			}
 
 			// 批次未满, 继续等待下次提交
-			if len(batch.items) < c.MaxMergerBatchSize {
+			if len(batch.list) < c.MaxMergerBatchSize {
 				continue
 			}
 
@@ -149,14 +143,14 @@ func (worker *MergeWorker) mergeWorkerMain(c *Config) {
 
 		// 打点统计
 		if worker.mergeType == common.PushTypeAll {
-			defaultServer.gStats.MergeralltotalIncr(int64(len(batch.items)))
+			gServer.gStats.MergeralltotalIncr(int64(len(batch.list)))
 			if err != nil {
-				defaultServer.gStats.MergerallfailIncr(int64(len(batch.items)))
+				gServer.gStats.MergerallfailIncr(int64(len(batch.list)))
 			}
 		} else if worker.mergeType == common.PushTypeRoom {
-			defaultServer.gStats.MergerroomtotalIncr(int64(len(batch.items)))
+			gServer.gStats.MergerroomtotalIncr(int64(len(batch.list)))
 			if err != nil {
-				defaultServer.gStats.MergerroomfailIncr(int64(len(batch.items)))
+				gServer.gStats.MergerroomfailIncr(int64(len(batch.list)))
 			}
 		}
 	}
@@ -180,7 +174,7 @@ func (worker *MergeWorker) pushRoom(room string, msg *json.RawMessage) (err erro
 	}
 	select {
 	case worker.contextChan <- context:
-		defaultServer.gStats.MergerpendingIncr()
+		gServer.gStats.MergerpendingIncr()
 	default:
 		err = common.ErrMergeChannelFull
 	}
@@ -194,7 +188,7 @@ func (worker *MergeWorker) pushAll(msg *json.RawMessage) (err error) {
 
 	select {
 	case worker.contextChan <- context:
-		defaultServer.gStats.MergerpendingIncr()
+		gServer.gStats.MergerpendingIncr()
 	default:
 		err = common.ErrMergeChannelFull
 	}

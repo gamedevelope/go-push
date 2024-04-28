@@ -1,6 +1,37 @@
 package gateway
 
-import "github.com/gamedevelope/go-push/src/common"
+import (
+	"github.com/gamedevelope/go-push/src/common"
+	"sync"
+)
+
+type ConnMap struct {
+	rwMutex sync.RWMutex
+
+	id2Conn map[uint64]*WSConnection
+}
+
+func (connMap *ConnMap) AddConn(wsConn *WSConnection) {
+	connMap.rwMutex.Lock()
+	defer connMap.rwMutex.Unlock()
+
+	connMap.id2Conn[wsConn.connId] = wsConn
+}
+
+func (connMap *ConnMap) DelConn(wsConn *WSConnection) {
+	connMap.rwMutex.Lock()
+	defer connMap.rwMutex.Unlock()
+
+	delete(connMap.id2Conn, wsConn.connId)
+}
+
+func (connMap *ConnMap) GetConn(uid uint64) (wsConn *WSConnection, exist bool) {
+	connMap.rwMutex.RLock()
+	defer connMap.rwMutex.RUnlock()
+
+	wsConn, exist = connMap.id2Conn[uid]
+	return
+}
 
 // PushJob 推送任务
 type PushJob struct {
@@ -14,6 +45,8 @@ type PushJob struct {
 
 // ConnMgr 连接管理器
 type ConnMgr struct {
+	connMap *ConnMap
+
 	buckets []*Bucket
 	jobChan []chan *PushJob // 每个Bucket对应一个Job Queue
 
@@ -30,7 +63,7 @@ func (connMgr *ConnMgr) dispatchWorkerMain(dispatchWorkerIdx int) {
 	for {
 		select {
 		case pushJob = <-connMgr.dispatchChan:
-			defaultServer.gStats.DispatchpendingDesc()
+			gServer.gStats.DispatchpendingDesc()
 
 			// 序列化
 			if pushJob.wsMsg, err = common.EncodeWSMessage(pushJob.bizMsg); err != nil {
@@ -38,7 +71,7 @@ func (connMgr *ConnMgr) dispatchWorkerMain(dispatchWorkerIdx int) {
 			}
 			// 分发给所有Bucket, 若Bucket拥塞则等待
 			for bucketIdx, _ = range connMgr.buckets {
-				defaultServer.gStats.PushjobpendingIncr()
+				gServer.gStats.PushjobpendingIncr()
 				connMgr.jobChan[bucketIdx] <- pushJob
 			}
 		}
@@ -52,7 +85,7 @@ func (connMgr *ConnMgr) jobWorkerMain(jobWorkerIdx int, bucketIdx int) {
 	for {
 		select {
 		case pushJob := <-connMgr.jobChan[bucketIdx]: // 从Bucket的job queue取出一个任务
-			defaultServer.gStats.PushjobpendingDesc()
+			gServer.gStats.PushjobpendingDesc()
 			if pushJob.pushType == common.PushTypeAll {
 				bucket.PushAll(pushJob.wsMsg)
 			} else if pushJob.pushType == common.PushTypeRoom {
@@ -70,8 +103,9 @@ func (connMgr *ConnMgr) GetBucket(wsConnection *WSConnection) (bucket *Bucket) {
 func (connMgr *ConnMgr) AddConn(wsConnection *WSConnection) {
 	bucket := connMgr.GetBucket(wsConnection)
 	bucket.AddConn(wsConnection)
+	connMgr.connMap.AddConn(wsConnection)
 
-	defaultServer.gStats.OnlineconnectionsIncr()
+	gServer.gStats.OnlineconnectionsIncr()
 }
 
 func (connMgr *ConnMgr) DelConn(wsConnection *WSConnection) {
@@ -81,8 +115,9 @@ func (connMgr *ConnMgr) DelConn(wsConnection *WSConnection) {
 
 	bucket = connMgr.GetBucket(wsConnection)
 	bucket.DelConn(wsConnection)
+	connMgr.connMap.DelConn(wsConnection)
 
-	defaultServer.gStats.OnlineconnectionsDesc()
+	gServer.gStats.OnlineconnectionsDesc()
 }
 
 func (connMgr *ConnMgr) JoinRoom(roomId string, wsConn *WSConnection) (err error) {
@@ -105,6 +140,22 @@ func (connMgr *ConnMgr) LeaveRoom(roomId string, wsConn *WSConnection) (err erro
 	return
 }
 
+func (connMgr *ConnMgr) PushOne(uid uint64, bizMsg *common.BizMessage) error {
+	conn, exist := connMgr.connMap.GetConn(uid)
+	if exist {
+		wsMsg, err := common.EncodeWSMessage(bizMsg)
+		if err != nil {
+			return err
+		}
+
+		if err = conn.SendMessage(wsMsg); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // PushAll 向所有在线用户发送消息
 func (connMgr *ConnMgr) PushAll(bizMsg *common.BizMessage) (err error) {
 	var (
@@ -118,10 +169,10 @@ func (connMgr *ConnMgr) PushAll(bizMsg *common.BizMessage) (err error) {
 
 	select {
 	case connMgr.dispatchChan <- pushJob:
-		defaultServer.gStats.DispatchpendingIncr()
+		gServer.gStats.DispatchpendingIncr()
 	default:
 		err = common.ErrDispatchChannelFull
-		defaultServer.gStats.DispatchfailIncr()
+		gServer.gStats.DispatchfailIncr()
 	}
 	return
 }
@@ -140,10 +191,10 @@ func (connMgr *ConnMgr) PushRoom(roomId string, bizMsg *common.BizMessage) (err 
 
 	select {
 	case connMgr.dispatchChan <- pushJob:
-		defaultServer.gStats.DispatchpendingIncr()
+		gServer.gStats.DispatchpendingIncr()
 	default:
 		err = common.ErrDispatchChannelFull
-		defaultServer.gStats.DispatchfailIncr()
+		gServer.gStats.DispatchfailIncr()
 	}
 	return
 }

@@ -36,7 +36,7 @@ func (b *Bucket) SetRoom(roomId string, room *Room) {
 	defer b.rwMutex.Unlock()
 
 	b.rooms[roomId] = room
-	defaultServer.gStats.RoomCount_INCR()
+	gServer.gStats.RoomCount_INCR()
 }
 
 func (b *Bucket) DelRoom(roomId string) {
@@ -44,7 +44,7 @@ func (b *Bucket) DelRoom(roomId string) {
 	defer b.rwMutex.Unlock()
 
 	delete(b.rooms, roomId)
-	defaultServer.gStats.RoomcountDesc()
+	gServer.gStats.RoomcountDesc()
 }
 
 func InitBucket(bucketIdx int) (bucket *Bucket) {

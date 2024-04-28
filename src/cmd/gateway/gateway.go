@@ -4,10 +4,11 @@ import (
 	"github.com/gamedevelope/go-push/src/cli"
 	"github.com/gamedevelope/go-push/src/internal/config"
 	"github.com/gamedevelope/go-push/src/internal/gateway"
+	"github.com/gamedevelope/go-push/src/pkg/util"
+	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
-	"time"
+	"net/http"
 )
 
 var (
@@ -39,11 +40,16 @@ func gatewayRun(cmd *cobra.Command, args []string) {
 		logrus.Infof(`成功解析配置文件 %v`, cf)
 	}
 
-	_ = gateway.NewServer(&config.AppConf.GatewayConf)
-
-	for {
-		time.Sleep(1 * time.Second)
+	upgrader := &websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
 	}
 
-	os.Exit(0)
+	gServer := gateway.NewServer(&config.AppConf.GatewayConf, upgrader)
+
+	util.Daemon(func() {
+		logrus.Infof(`gateway server quit`)
+		gServer.Exit()
+	})
 }

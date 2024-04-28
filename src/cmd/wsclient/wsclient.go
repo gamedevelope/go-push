@@ -45,18 +45,18 @@ func NewWsClientManager(addrIp, addrPort, path string, timeout int) *websocketCl
 }
 
 // 链接服务端
-func (wsc *websocketClientManager) dail() {
+func (wsc *websocketClientManager) dail() bool {
 	var err error
 	u := url.URL{Scheme: "ws", Host: *wsc.addr, Path: wsc.path}
 	fmt.Println("connecting to:", u.String())
 	wsc.conn, _, err = websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
 		fmt.Println(err)
-		return
+		return false
 	}
 	wsc.isAlive = true
 	log.Printf("connecting to %s 链接成功！！！", u.String())
-
+	return true
 }
 
 // 发送消息到服务端
@@ -99,11 +99,12 @@ func (wsc *websocketClientManager) readMsgThread() {
 func (wsc *websocketClientManager) start() {
 	for {
 		if wsc.isAlive == false {
-			wsc.dail()
-			wsc.sendMsgThread()
-			wsc.readMsgThread()
-			wsc.Msg()  //构造假消息
-			wsc.Recv() //接收处理服务端返回到消息
+			if wsc.dail() {
+				wsc.sendMsgThread()
+				wsc.readMsgThread()
+				wsc.Msg()  //构造假消息
+				wsc.Recv() //接收处理服务端返回到消息
+			}
 		}
 		time.Sleep(time.Second * time.Duration(wsc.timeout))
 	}
@@ -114,7 +115,7 @@ func (wsc *websocketClientManager) Msg() {
 	joinData := common.BizJoinData{Room: `room1`}
 	bs, _ := json.Marshal(joinData)
 	msg := common.BizMessage{
-		Type: "JOIN",
+		Type: common.JOIN,
 		Data: bs,
 	}
 
@@ -125,7 +126,7 @@ func (wsc *websocketClientManager) Msg() {
 	go func() {
 		for {
 			msg = common.BizMessage{
-				Type: "PING",
+				Type: common.PING,
 				Data: nil,
 			}
 			bs, _ = json.Marshal(msg)

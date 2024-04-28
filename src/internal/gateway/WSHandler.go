@@ -11,7 +11,7 @@ import (
 
 // 每隔1秒, 检查一次连接是否健康
 func (wsConnection *WSConnection) heartbeatChecker() {
-	timer := time.NewTimer(time.Duration(defaultServer.cfg.WsHeartbeatInterval) * time.Second)
+	timer := time.NewTimer(time.Duration(gServer.cfg.WsHeartbeatInterval) * time.Second)
 	for {
 		select {
 		case <-timer.C:
@@ -19,7 +19,7 @@ func (wsConnection *WSConnection) heartbeatChecker() {
 				wsConnection.Close()
 				goto EXIT
 			}
-			timer.Reset(time.Duration(defaultServer.cfg.WsHeartbeatInterval) * time.Second)
+			timer.Reset(time.Duration(gServer.cfg.WsHeartbeatInterval) * time.Second)
 		case <-wsConnection.closeChan:
 			timer.Stop()
 			goto EXIT
@@ -42,8 +42,8 @@ func (wsConnection *WSConnection) handlePing(bizReq *common.BizMessage) (bizResp
 		return
 	}
 	bizResp = &common.BizMessage{
-		Type: "PONG",
-		Data: json.RawMessage(buf),
+		Type: common.PONG,
+		Data: buf,
 	}
 	return
 }
@@ -62,7 +62,7 @@ func (wsConnection *WSConnection) handleJoin(bizReq *common.BizMessage) (bizResp
 		err = common.ErrRoomIdInvalid
 		return
 	}
-	if len(wsConnection.rooms) >= defaultServer.cfg.MaxJoinRoom {
+	if len(wsConnection.rooms) >= gServer.cfg.MaxJoinRoom {
 		// 超过了房间数量限制, 忽略这个请求
 		return
 	}
@@ -72,7 +72,7 @@ func (wsConnection *WSConnection) handleJoin(bizReq *common.BizMessage) (bizResp
 		return
 	}
 	// 建立房间 -> 连接的关系
-	if err = defaultServer.connMgr.JoinRoom(bizJoinData.Room, wsConnection); err != nil {
+	if err = gServer.connMgr.JoinRoom(bizJoinData.Room, wsConnection); err != nil {
 		return
 	}
 	// 建立连接 -> 房间的关系
@@ -100,7 +100,7 @@ func (wsConnection *WSConnection) handleLeave(bizReq *common.BizMessage) (bizRes
 		return
 	}
 	// 删除房间 -> 连接的关系
-	if err = defaultServer.connMgr.LeaveRoom(bizLeaveData.Room, wsConnection); err != nil {
+	if err = gServer.connMgr.LeaveRoom(bizLeaveData.Room, wsConnection); err != nil {
 		return
 	}
 	// 删除连接 -> 房间的关系
@@ -109,35 +109,25 @@ func (wsConnection *WSConnection) handleLeave(bizReq *common.BizMessage) (bizRes
 }
 
 func (wsConnection *WSConnection) leaveAll() {
-	var (
-		roomId string
-	)
 	// 从所有房间中退出
-	for roomId, _ = range wsConnection.rooms {
-		defaultServer.connMgr.LeaveRoom(roomId, wsConnection)
+	for roomId, _ := range wsConnection.rooms {
+		gServer.connMgr.LeaveRoom(roomId, wsConnection)
 		delete(wsConnection.rooms, roomId)
 	}
 }
 
 // WSHandle 处理websocket请求
 func (wsConnection *WSConnection) WSHandle() {
-	var (
-		message *common.WSMessage
-		bizReq  *common.BizMessage
-		bizResp *common.BizMessage
-		err     error
-		buf     []byte
-	)
-
 	// 连接加入管理器, 可以推送端查找到
-	defaultServer.connMgr.AddConn(wsConnection)
+	gServer.connMgr.AddConn(wsConnection)
 
 	// 心跳检测线程
 	go wsConnection.heartbeatChecker()
 
 	// 请求处理协程
 	for {
-		if message, err = wsConnection.ReadMessage(); err != nil {
+		message, err := wsConnection.ReadMessage()
+		if err != nil {
 			goto ERR
 		}
 
@@ -150,11 +140,12 @@ func (wsConnection *WSConnection) WSHandle() {
 		}
 
 		// 解析消息体
-		if bizReq, err = common.DecodeBizMessage(message.MsgData); err != nil {
+		bizReq, err := common.DecodeBizMessage(message.MsgData)
+		if err != nil {
 			goto ERR
 		}
 
-		bizResp = nil
+		var bizResp *common.BizMessage
 
 		// 1,收到PING则响应PONG: {"type": "PING"}, {"type": "PONG"}
 		// 2,收到JOIN则加入ROOM: {"type": "JOIN", "data": {"room": "chrome-plugin"}}
@@ -177,7 +168,8 @@ func (wsConnection *WSConnection) WSHandle() {
 		}
 
 		if bizResp != nil {
-			if buf, err = json.Marshal(*bizResp); err != nil {
+			buf, err := json.Marshal(*bizResp)
+			if err != nil {
 				goto ERR
 			}
 			// socket缓冲区写满不是致命错误
@@ -199,6 +191,6 @@ ERR:
 	wsConnection.leaveAll()
 
 	// 从连接池中移除
-	defaultServer.connMgr.DelConn(wsConnection)
+	gServer.connMgr.DelConn(wsConnection)
 	return
 }

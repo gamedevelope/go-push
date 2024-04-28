@@ -13,12 +13,11 @@ type Room struct {
 	connHash map[uint64]*WSConnection
 }
 
-func InitRoom(roomId string) (room *Room) {
-	room = &Room{
+func InitRoom(roomId string) *Room {
+	return &Room{
 		roomId:   roomId,
 		connHash: make(map[uint64]*WSConnection),
 	}
-	return
 }
 
 func (room *Room) Join(wsConn *WSConnection) (err error) {

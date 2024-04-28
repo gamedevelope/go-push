@@ -9,6 +9,7 @@ import (
 const (
 	PushTypeRoom = 1 // 推送房间
 	PushTypeAll  = 2 // 推送在线
+	PushTypeOne  = 3 // 推送单个
 )
 
 // WSMessage websocket的Message对象
@@ -17,17 +18,28 @@ type WSMessage struct {
 	MsgData []byte
 }
 
+type BizMessageType string
+
+const (
+	PING    BizMessageType = "PING"
+	PONG    BizMessageType = "PONG"
+	JOIN    BizMessageType = "JOIN"
+	LEAVE   BizMessageType = "LEAVE"
+	PUSH    BizMessageType = "PUSH"
+	MESSAGE BizMessageType = "MESSAGE"
+)
+
 // BizMessage 业务消息的固定格式(type+data)
 type BizMessage struct {
-	Type string          `json:"type"` // type消息类型: PING, PONG, JOIN, LEAVE, PUSH
+	Type BizMessageType  `json:"type"` // type消息类型: PING, PONG, JOIN, LEAVE, PUSH
 	Data json.RawMessage `json:"data"` // data数据字段
 }
 
 // Data数据类型
 
-// BizPushData PUSH
-type BizPushData struct {
-	Items []*json.RawMessage `json:"items"`
+// BizMessageData PUSH
+type BizMessageData struct {
+	List []*json.RawMessage `json:"list"`
 }
 
 // BizPingData PING

@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	defaultServer *Server
+	gServer *Server
 )
 
 type Server struct {
@@ -32,33 +32,26 @@ func (s *Server) InitStats(c *Config) (err error) {
 }
 
 func (s *Server) InitConnMgr(c *Config) (err error) {
-	var (
-		bucketIdx         int
-		jobWorkerIdx      int
-		dispatchWorkerIdx int
-		cm                *ConnMgr
-	)
-
-	cm = &ConnMgr{
+	s.connMgr = &ConnMgr{
+		connMap:      &ConnMap{id2Conn: make(map[uint64]*WSConnection)},
 		buckets:      make([]*Bucket, c.BucketCount),
 		jobChan:      make([]chan *PushJob, c.BucketCount),
 		dispatchChan: make(chan *PushJob, c.DispatchChannelSize),
 	}
 
-	for bucketIdx, _ = range cm.buckets {
-		cm.buckets[bucketIdx] = InitBucket(bucketIdx)                       // 初始化Bucket
-		cm.jobChan[bucketIdx] = make(chan *PushJob, c.BucketJobChannelSize) // Bucket的Job队列
+	for bucketIdx := range s.connMgr.buckets {
+		s.connMgr.buckets[bucketIdx] = InitBucket(bucketIdx)                       // 初始化Bucket
+		s.connMgr.jobChan[bucketIdx] = make(chan *PushJob, c.BucketJobChannelSize) // Bucket的Job队列
 		// Bucket的Job worker
-		for jobWorkerIdx = 0; jobWorkerIdx < c.BucketJobWorkerCount; jobWorkerIdx++ {
-			go cm.jobWorkerMain(jobWorkerIdx, bucketIdx)
+		for jobWorkerIdx := 0; jobWorkerIdx < c.BucketJobWorkerCount; jobWorkerIdx++ {
+			go s.connMgr.jobWorkerMain(jobWorkerIdx, bucketIdx)
 		}
 	}
 	// 初始化分发协程, 用于将消息扇出给各个Bucket
-	for dispatchWorkerIdx = 0; dispatchWorkerIdx < c.DispatchWorkerCount; dispatchWorkerIdx++ {
-		go cm.dispatchWorkerMain(dispatchWorkerIdx)
+	for dispatchWorkerIdx := 0; dispatchWorkerIdx < c.DispatchWorkerCount; dispatchWorkerIdx++ {
+		go s.connMgr.dispatchWorkerMain(dispatchWorkerIdx)
 	}
 
-	s.connMgr = cm
 	return
 }
 
@@ -114,8 +107,7 @@ func (s *Server) InitMerger(c *Config) (err error) {
 func (s *Server) InitService(c *Config) (err error) {
 	// 路由
 	mux := http.NewServeMux()
-	mux.HandleFunc("/push/all", s.gService.handlePushAll)
-	mux.HandleFunc("/push/room", s.gService.handlePushRoom)
+	mux.HandleFunc("/send", s.gService.handleSend)
 	mux.HandleFunc("/stats", s.gService.handleStats)
 
 	// HTTP/2 TLS服务
@@ -127,41 +119,50 @@ func (s *Server) InitService(c *Config) (err error) {
 			Handler:      mux,
 		}}
 
+	// 允许跨域
+	logrus.Infof(`允许跨域 %v`, c.ServicePort)
+
 	go s.gService.server.ListenAndServe()
 	return
 }
 
-func NewServer(c *Config) *Server {
+func NewServer(c *Config, upgrader *websocket.Upgrader) *Server {
 	var err error
 
-	defaultServer = &Server{
-		cfg: c,
+	gServer = &Server{
+		cfg:        c,
+		wsUpgrader: upgrader,
 	}
 
 	// 统计
-	if err = defaultServer.InitStats(c); err != nil {
+	if err = gServer.InitStats(c); err != nil {
 		logrus.Panicf(`init stats %v`, err)
 	}
 
 	// 初始化连接管理器
-	if err = defaultServer.InitConnMgr(c); err != nil {
+	if err = gServer.InitConnMgr(c); err != nil {
 		logrus.Panicf(`init conn mgr %v`, err)
 	}
 
 	// 初始化websocket服务器
-	if err = defaultServer.InitWSServer(c); err != nil {
+	if err = gServer.InitWSServer(c); err != nil {
 		logrus.Panicf(`init ws server %v`, err)
 	}
 
 	// 初始化merger合并层
-	if err = defaultServer.InitMerger(c); err != nil {
+	if err = gServer.InitMerger(c); err != nil {
 		logrus.Panicf(`init merger %v`, err)
 	}
 
 	// 初始化service接口
-	if err = defaultServer.InitService(c); err != nil {
+	if err = gServer.InitService(c); err != nil {
 		logrus.Panicf(`init service %v`, err)
 	}
 
-	return defaultServer
+	return gServer
+}
+
+func (s *Server) Exit() {
+	s.wsServer.server.Close()
+	s.gService.server.Close()
 }

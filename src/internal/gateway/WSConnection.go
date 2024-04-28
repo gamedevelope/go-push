@@ -112,13 +112,11 @@ func (wsConnection *WSConnection) Close() {
 
 // IsAlive 检查心跳（不需要太频繁）
 func (wsConnection *WSConnection) IsAlive() bool {
-	now := time.Now()
-
 	wsConnection.mutex.Lock()
 	defer wsConnection.mutex.Unlock()
 
 	// 连接已关闭 或者 太久没有心跳
-	if wsConnection.isClosed || now.Sub(wsConnection.lastHeartbeatTime) > time.Duration(defaultServer.cfg.WsHeartbeatInterval)*time.Second {
+	if wsConnection.isClosed || time.Now().Sub(wsConnection.lastHeartbeatTime) > time.Duration(gServer.cfg.WsHeartbeatInterval)*time.Second {
 		return false
 	}
 	return true
@@ -126,12 +124,8 @@ func (wsConnection *WSConnection) IsAlive() bool {
 
 // KeepAlive 更新心跳
 func (wsConnection *WSConnection) KeepAlive() {
-	var (
-		now = time.Now()
-	)
-
 	wsConnection.mutex.Lock()
 	defer wsConnection.mutex.Unlock()
 
-	wsConnection.lastHeartbeatTime = now
+	wsConnection.lastHeartbeatTime = time.Now()
 }

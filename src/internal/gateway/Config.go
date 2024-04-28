@@ -2,6 +2,7 @@ package gateway
 
 // Config 程序配置
 type Config struct {
+	AuthInterface        string `json:"authInterface"`
 	WsPort               int    `json:"wsPort"`
 	WsReadTimeout        int    `json:"wsReadTimeout"`
 	WsWriteTimeout       int    `json:"wsWriteTimeout"`

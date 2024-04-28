@@ -2,68 +2,92 @@ package gateway
 
 import (
 	"encoding/json"
+	"github.com/gamedevelope/go-push/src/common"
+	"github.com/sirupsen/logrus"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 type Service struct {
 	server *http.Server
 }
 
-// 全量推送POST msg={}
-func (s *Service) handlePushAll(resp http.ResponseWriter, req *http.Request) {
-	var (
-		err    error
-		items  string
-		msgArr []json.RawMessage
-		msgIdx int
-	)
-	if err = req.ParseForm(); err != nil {
-		return
-	}
+type SendRangeEnum string
 
-	items = req.PostForm.Get("items")
-	if err = json.Unmarshal([]byte(items), &msgArr); err != nil {
-		return
-	}
+const (
+	SendRangeAll  SendRangeEnum = "all"
+	SendRangeRoom SendRangeEnum = "room"
+	SendRangeOne  SendRangeEnum = "one"
+)
 
-	for msgIdx, _ = range msgArr {
-		defaultServer.gMerger.PushAll(&msgArr[msgIdx])
-	}
+type SendReq struct {
+	Range    string          `json:"range"`
+	UniqueId string          `json:"unique_id"`
+	Message  json.RawMessage `json:"message"`
 }
 
-// 房间推送POST room=xxx&msg
-func (s *Service) handlePushRoom(resp http.ResponseWriter, req *http.Request) {
-	var (
-		err    error
-		room   string
-		items  string
-		msgArr []json.RawMessage
-		msgIdx int
-	)
-	if err = req.ParseForm(); err != nil {
+// handleSend ...
+func (s *Service) handleSend(resp http.ResponseWriter, req *http.Request) {
+	resp.Header().Set("Access-Control-Allow-Origin", "*")             //允许访问所有域
+	resp.Header().Add("Access-Control-Allow-Headers", "Content-Type") //header的类型
+	resp.Header().Set("content-type", "application/json")             //返回数据格式是json
+
+	if strings.EqualFold(req.Method, "OPTIONS") {
 		return
 	}
 
-	room = req.PostForm.Get("room")
-	items = req.PostForm.Get("items")
-
-	if err = json.Unmarshal([]byte(items), &msgArr); err != nil {
+	var sr SendReq
+	if err := json.NewDecoder(req.Body).Decode(&sr); err != nil {
+		logrus.Errorf(`%v`, err)
 		return
 	}
 
-	for msgIdx, _ = range msgArr {
-		defaultServer.gMerger.PushRoom(room, &msgArr[msgIdx])
+	logrus.Infof(`%+v`, sr)
+
+	switch SendRangeEnum(sr.Range) {
+	case SendRangeAll:
+		if err := gServer.gMerger.PushAll(&sr.Message); err != nil {
+			logrus.Errorf(`%v`, err)
+			return
+		}
+	case SendRangeRoom:
+		if err := gServer.gMerger.PushRoom(sr.UniqueId, &sr.Message); err != nil {
+			logrus.Errorf(`%v`, err)
+			return
+		}
+	case SendRangeOne:
+		bizMessage := common.BizMessageData{
+			List: []*json.RawMessage{&sr.Message},
+		}
+
+		buf, err := json.Marshal(bizMessage)
+		if err != nil {
+			return
+		}
+
+		bizMsg := &common.BizMessage{
+			Type: common.MESSAGE,
+			Data: buf,
+		}
+
+		// unique_id 转成 uint64
+		if connId, err := strconv.ParseUint(sr.UniqueId, 10, 64); err != nil {
+			logrus.Errorf(`%v`, err)
+			return
+		} else if err = gServer.connMgr.PushOne(connId, bizMsg); err != nil {
+			logrus.Errorf(`%v`, err)
+			return
+		}
+	default:
+		return
 	}
 }
 
 // 统计
 func (s *Service) handleStats(resp http.ResponseWriter, req *http.Request) {
-	var (
-		data []byte
-		err  error
-	)
-
-	if data, err = defaultServer.gStats.Dump(); err != nil {
+	data, err := gServer.gStats.Dump()
+	if err != nil {
 		return
 	}
 
