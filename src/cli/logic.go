@@ -2,7 +2,7 @@ package cli
 
 import (
 	"fmt"
-	"github.com/gamedevelope/go-push/src/internal/logic"
+	logic2 "github.com/gamedevelope/go-push/src/logic"
 	"github.com/spf13/cobra"
 	"log/slog"
 	"os"
@@ -26,19 +26,19 @@ func logicRun(cmd *cobra.Command, args []string) {
 		err error
 	)
 
-	if err = logic.InitConfig(confFile); err != nil {
+	if err = logic2.InitConfig(confFile); err != nil {
 		goto ERR
 	}
 
-	if err = logic.InitStats(); err != nil {
+	if err = logic2.InitStats(); err != nil {
 		goto ERR
 	}
 
-	if err = logic.InitGateConnMgr(); err != nil {
+	if err = logic2.InitGateConnMgr(); err != nil {
 		goto ERR
 	}
 
-	if err = logic.InitService(); err != nil {
+	if err = logic2.InitService(); err != nil {
 		goto ERR
 	}
 

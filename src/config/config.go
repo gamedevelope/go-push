@@ -2,8 +2,8 @@ package config
 
 import (
 	"encoding/json"
-	"github.com/gamedevelope/go-push/src/internal/gateway"
-	"github.com/gamedevelope/go-push/src/internal/logic"
+	"github.com/gamedevelope/go-push/src/gateway"
+	"github.com/gamedevelope/go-push/src/logic"
 	"os"
 )
 

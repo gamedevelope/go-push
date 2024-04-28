@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/gamedevelope/go-push/src/cli"
 	"github.com/gamedevelope/go-push/src/common"
-	"github.com/gamedevelope/go-push/src/internal/config"
+	"github.com/gamedevelope/go-push/src/config"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"log"
