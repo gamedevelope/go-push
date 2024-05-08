@@ -43,7 +43,7 @@ func (s *Service) handleSend(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	logrus.Infof(`%+v`, sr)
+	logrus.Infof(`%+v`, string(sr.Message))
 
 	switch SendRangeEnum(sr.Range) {
 	case SendRangeAll:
